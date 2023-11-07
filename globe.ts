@@ -5,7 +5,7 @@ import {
     mat4,
     perspective,
     rotateX,
-    rotateY,
+    rotateY, rotateZ,
     translate,
     vec2,
     vec4
@@ -22,16 +22,21 @@ let mouse_button_down:boolean = false;
 let prevMouseX:number = 0;
 let prevMouseY:number = 0;
 let zoom:number = 45;
+let earthRotation:number = 0;
 
 let vPosition:GLint; //
 let vNormal:GLint; //actually need a normal vector to modify
 let vTangent:GLint; //need a tangent vector as well
-let utexmapsampler:WebGLUniformLocation;//this will be a pointer to our sampler2D
+let ucolormapsampler:WebGLUniformLocation;//this will be a pointer to our sampler2D
 let unormalmapsampler:WebGLUniformLocation;
+let ucloudmapsampler:WebGLUniformLocation;
+let unightmapsampler:WebGLUniformLocation;
+let uspecularmapsampler:WebGLUniformLocation;
 let uLightPosition:WebGLUniformLocation;
 let uAmbienLight:WebGLUniformLocation;
 let uLightColor:WebGLUniformLocation;
 let vTexCoord:GLint;
+let uMode:WebGLUniformLocation;
 
 
 //uniform locations
@@ -44,13 +49,26 @@ let p:mat4; //local projection
 //
 let numVerts:number;
 
-let flattex:WebGLTexture;
-let brickcolortex:WebGLTexture;
-let bricknormaltex:WebGLTexture;
+let earthTex:WebGLTexture;
+let cloudTex:WebGLTexture;
+let nightTex:WebGLTexture;
+let normalTex:WebGLTexture;
+let specTex:WebGLTexture;
 
-let flatimage:HTMLImageElement;
-let brickcolorimage:HTMLImageElement;
-let bricknormalimage:HTMLImageElement;
+let earthImage:HTMLImageElement;
+let cloudImage:HTMLImageElement;
+let nightImage:HTMLImageElement;
+let normalImage:HTMLImageElement;
+let specImage:HTMLImageElement;
+
+let MODE_COLOR = 1;
+let MODE_CLOUD = 2;
+let MODE_NIGHT = 3;
+let MODE_NORMAL = 4;
+let MODE_SPEC = 5;
+let MODE_ALL = 6;
+let currentMode = 1;
+
 
 window.onload = function init() {
 
@@ -80,11 +98,18 @@ window.onload = function init() {
     uLightColor = gl.getUniformLocation(program, "light_color");
     uLightPosition = gl.getUniformLocation(program, "light_position");
     uAmbienLight = gl.getUniformLocation(program, "ambient_light");
+    uMode = gl.getUniformLocation(program, "mode")
 
-    utexmapsampler = gl.getUniformLocation(program, "colorMap");
-    gl.uniform1i(utexmapsampler, 0);//assign this one to texture unit 0
+    ucolormapsampler = gl.getUniformLocation(program, "colorMap");
+    gl.uniform1i(ucolormapsampler, 0);//assign this one to texture unit 0
+    ucloudmapsampler = gl.getUniformLocation(program, "cloudMap");
+    gl.uniform1i(ucloudmapsampler, 1);//assign this one to texture unit 0
     unormalmapsampler = gl.getUniformLocation(program, "normalMap");
-    gl.uniform1i(unormalmapsampler, 1);//assign normal map to 2nd texture unit
+    gl.uniform1i(unormalmapsampler, 2);//assign normal map to 2nd texture unit
+    unightmapsampler = gl.getUniformLocation(program, "nightMap");
+    gl.uniform1i(unightmapsampler, 3);//assign normal map to 2nd texture unit
+    uspecularmapsampler = gl.getUniformLocation(program, "specMap");
+    gl.uniform1i(uspecularmapsampler, 4);//assign this one to texture unit 0
 
 
     //set up basic perspective viewing
@@ -112,6 +137,24 @@ window.onload = function init() {
                     zoom -= 5;
                 }
                 break;
+            case "1":
+                currentMode = MODE_COLOR;
+                break;
+            case "2":
+                currentMode = MODE_CLOUD;
+                break;
+            case "3":
+                currentMode = MODE_NIGHT;
+                break;
+            case "4":
+                currentMode = MODE_NORMAL;
+                break;
+            case "5":
+                currentMode = MODE_SPEC;
+                break;
+            case "6":
+                currentMode = MODE_ALL;
+                break;
         }
 
         p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
@@ -119,9 +162,19 @@ window.onload = function init() {
         requestAnimationFrame(render);//and now we need a new frame since we made a change
     });
 
+    window.setInterval(update, 16); //target 60 frames per second
+
     requestAnimationFrame(render);
 
 };
+
+function update(){
+    earthRotation += 0.25;
+    if(earthRotation >= 360){
+        earthRotation %= 360;
+    }
+    requestAnimationFrame(render);
+}
 
 //record that the mouse button is now down
 function mouse_down(event:MouseEvent) {
@@ -162,43 +215,60 @@ function makeSphereAndBuffer(){
     numVerts = 0;
 
     for (let lat:number = 0; lat <= Math.PI ; lat += step){ //latitude
-        for (let lon:number = 0; lon + step <= 2*Math.PI; lon += step){ //longitude
-            let latTexCoord0 = (0 + (lon)/ (Math.PI * 2));
-            let latTexCoord1 = (0 + (lon + 1 * step)/ (Math.PI * 2));
-            let lonTexCoord0 = (0 - (lat + step)/ (Math.PI * 1));
-            let lonTexCoord1 = (0 - (lat) / (Math.PI * 1));
+        for (let lon:number = 0; lon + step <= 2 * Math.PI; lon += step){ //longitude
+            let lonTexCoord0 = (lon)/ (Math.PI * 2);
+            let lonTexCoord1 = (lon + step)/ (Math.PI * 2);
+            let latTexCoord0 = - (lat + step)/ (Math.PI);
+            let latTexCoord1 = - (lat) / (Math.PI);
+
+            let ax = Math.sin(lat) * Math.sin(lon);
+            let ay = Math.cos(lat);
+            let az = Math.cos(lon) * Math.sin(lat);
+
+            let bx = Math.sin(lat) * Math.sin(lon + step);
+            let by = Math.cos(lat);
+            let bz = Math.sin(lat) * Math.cos(lon + step)
+
+            let cx = Math.sin(lat + step) * Math.sin(lon + step);
+            let cy = Math.cos(lat + step);
+            let cz = Math.cos(lon + step) * Math.sin(lat + step);
+
+            let dx = Math.sin(lat + step) * Math.sin(lon);
+            let dy = Math.cos(lat + step);
+            let dz = Math.sin(lat + step) * Math.cos(lon);
+
+            //TODO tangents need to be calculated properly. right now tangent = normal
             //triangle 1
-
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon) ,Math.cos(lat) , Math.cos(lon) * Math.sin(lat), 1.0));
+            sphereverts.push(new vec4( ax, ay, az, 1.0));
+            sphereverts.push(new vec4( ax, ay, az, 0.0));
             sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon), Math.cos(lat),Math.cos(lon) * Math.sin(lat),  0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon), Math.cos(lat),Math.cos(lon) * Math.sin(lat),  0.0));
-            sphereverts.push(new vec2(latTexCoord0,lonTexCoord1)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord0,latTexCoord1)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon + step), Math.cos(lat),Math.sin(lat) * Math.cos(lon + step),  1.0));
+            sphereverts.push(new vec4(bx, by, bz,  1.0));
+            sphereverts.push(new vec4(bx, by, bz,  0.0));
             sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon + step),  Math.cos(lat),Math.sin(lat) * Math.cos(lon + step), 0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon + step),  Math.cos(lat),Math.sin(lat) * Math.cos(lon + step), 0.0));
-            sphereverts.push(new vec2(latTexCoord1,lonTexCoord1)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord1,latTexCoord1)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step), Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step),  1.0));
+            sphereverts.push(new vec4( cx, cy, cz, 1.0));
+            sphereverts.push(new vec4( cx, cy, cz, 0.0));
             sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step), Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step),  0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step), Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step),  0.0));
-            sphereverts.push(new vec2(latTexCoord1,lonTexCoord0)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord1,latTexCoord0)); //texture coordinates, bottom left
 
             // //triangle 2
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step),  Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step), 1.0));
+            sphereverts.push(new vec4( cx, cy, cz, 1.0));
+            sphereverts.push(new vec4( cx, cy, cz, 0.0));
             sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step),  Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step), 0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step),  Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step), 0.0));
-            sphereverts.push(new vec2(latTexCoord1,lonTexCoord0)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord1,latTexCoord0)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon), Math.cos(lat + step),Math.sin(lat + step) * Math.cos(lon),  1.0));
+            sphereverts.push(new vec4(dx, dy, dz,  1.0));
+            sphereverts.push(new vec4(dx, dy, dz, 0.0));
             sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon), Math.cos(lat + step), Math.sin(lat + step) * Math.cos(lon), 0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon), Math.cos(lat + step), Math.sin(lat + step) * Math.cos(lon), 0.0));
-            sphereverts.push(new vec2(latTexCoord0,lonTexCoord0)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord0,latTexCoord0)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon), Math.cos(lat),Math.cos(lon) * Math.sin(lat),  1.0));
+            sphereverts.push(new vec4( ax, ay, az, 1.0));
+            sphereverts.push(new vec4( ax, ay, az,  0.0));
             sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon),  Math.cos(lat),Math.cos(lon) * Math.sin(lat), 0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon),  Math.cos(lat),Math.cos(lon) * Math.sin(lat), 0.0));
-            sphereverts.push(new vec2(latTexCoord0,lonTexCoord1)); //texture coordinates, bottom left
+            sphereverts.push(new vec2(lonTexCoord0,latTexCoord1)); //texture coordinates, bottom left
 
             numVerts += 6;
         }
@@ -212,7 +282,7 @@ function makeSphereAndBuffer(){
     gl.bufferData(gl.ARRAY_BUFFER, flatten(sphereverts), gl.STATIC_DRAW);
 
     vPosition = gl.getAttribLocation(program, "vPosition");
-    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 56, 0); //stride is 56 bytes total for position, normal, tangent texcoord
+    gl.vertexAttribPointer(vPosition, 4, gl.FLOAT, false, 56, 0);
     gl.enableVertexAttribArray(vPosition);
 
     vNormal = gl.getAttribLocation(program, "vNormal");
@@ -229,17 +299,31 @@ function makeSphereAndBuffer(){
 
 }
 
-//https://developer.mozilla.org/en-US/docs/Web/API/WebGL_API/Tutorial/Using_textures_in_WebGL
 function initTextures() {
-    brickcolortex = gl.createTexture();
-    brickcolorimage = new Image();
-    brickcolorimage.onload = function() { handleTextureLoaded(brickcolorimage, brickcolortex); }
-    brickcolorimage.src = '../textures/Earth.png';
+    earthTex = gl.createTexture();
+    earthImage = new Image();
+    earthImage.onload = function() { handleTextureLoaded(earthImage, earthTex); }
+    earthImage.src = '../textures/Earth.png';
 
-    bricknormaltex = gl.createTexture();
-    bricknormalimage = new Image();
-    bricknormalimage.onload = function() { handleTextureLoaded(bricknormalimage, bricknormaltex); }
-    bricknormalimage.src = '../textures/EarthNormal.png';
+    cloudTex = gl.createTexture();
+    cloudImage = new Image();
+    cloudImage.onload = function() { handleTextureLoaded(cloudImage, cloudTex); }
+    cloudImage.src = '../textures/earthcloudmap-visness.png';
+
+    nightTex = gl.createTexture();
+    nightImage = new Image();
+    nightImage.onload = function() { handleTextureLoaded(nightImage, nightTex); }
+    nightImage.src = '../textures/EarthNight.png';
+
+    normalTex = gl.createTexture();
+    normalImage = new Image();
+    normalImage.onload = function() { handleTextureLoaded(normalImage, normalTex); }
+    normalImage.src = '../textures/EarthNormal.png';
+
+    specTex = gl.createTexture();
+    specImage = new Image();
+    specImage.onload = function() { handleTextureLoaded(specImage, specTex); }
+    specImage.src = '../textures/EarthSpec.png';
 }
 
 function handleTextureLoaded(image:HTMLImageElement, texture:WebGLTexture) {
@@ -261,19 +345,37 @@ function render(){
     //position camera 10 units back from origin
     let camera:mat4 = lookAt(new vec4(0, 0, 5, 1), new vec4(0, 0, 0, 1), new vec4(0, 1, 0, 0));
 
+    let lightPos = new vec4(0, 0, 50, 1);
 
-    gl.uniform4fv(uLightPosition, [0, 0, 50, 1]);  //light is locked to the camera position
+    gl.uniform4fv(uLightPosition, rotateY(yAngle).mult(rotateX(xAngle).mult(lightPos)));
     gl.uniform4fv(uLightColor, [1,1,1,1]);
-    gl.uniform4fv(uAmbienLight, [1, 1, 1, 1]);
+    gl.uniform4fv(uAmbienLight, [0.1, 0.1, 0.1, 1]);
 
+    gl.uniform1f(uMode, currentMode);
 
-    mv = camera.mult(rotateY(yAngle).mult(rotateX(xAngle)));
+    mv = camera.mult(rotateY(yAngle).mult(rotateX(xAngle).mult(rotateY(earthRotation))));
     gl.uniformMatrix4fv(umv, false, mv.flatten());
 
-    gl.activeTexture(gl.TEXTURE0); //texture unit 0 should be mapped to...
-    gl.bindTexture(gl.TEXTURE_2D, brickcolortex); //which texture do we want?
-    gl.activeTexture(gl.TEXTURE1); //and now that we're drawing the normal mapped square
-    gl.bindTexture(gl.TEXTURE_2D, bricknormaltex); //switch to the normal map texture
+    // COLOR
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, earthTex);
+
+    // CLOUD
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, cloudTex);
+
+    // NORMAL
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, normalTex);
+
+    // NIGHT
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, nightTex);
+
+    // SPECULAR
+    gl.activeTexture(gl.TEXTURE4);
+    gl.bindTexture(gl.TEXTURE_2D, specTex);
+
     gl.drawArrays( gl.TRIANGLES, 0, numVerts );
 
 }
