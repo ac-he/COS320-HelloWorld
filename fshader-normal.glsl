@@ -34,22 +34,13 @@ void main()
 		//binormal is cross of normal and tangent vectors in eye space
 		vec3 vBinormal = cross(vNormal, vTangent);
 
-		//construct a change of coordinate frame mat4 with columns of
-		//Tangent, Binormal, Normal, (0,0,0,1)
-		mat4 mTangentSpace = mat4(vec4(vTangent,0.0), vec4(vBinormal,0.0), vec4(vNormal,0.0), vec4(0.0, 0.0, 0.0, 1.0));
-		//This will transform from local space (normal map values) to eye space
-
 		vec3 L = normalize(light_position - position).xyz;
 		vec3 E = normalize(-position).xyz;
-
 		vec4 N = vec4(vN, 0.0);
-		//multiply change of coordinate frame matrix by normal map value
-		//to convert from local space to eye space
-		N = mTangentSpace * N;
 
 		vec4 amb = texture(colorMap, ftexCoord) * ambient_light;
 		//calculate diffuse term using our eye-space vectors and the color map value
-		vec4 diff = max(dot(L,N.xyz), 0.0) * texture(colorMap, ftexCoord) * light_color;
+		vec4 diff = max(dot(L, N.xyz), 0.0) * texture(colorMap, ftexCoord) * light_color;
 
 		fColor = amb + diff;
 	}
@@ -58,7 +49,7 @@ void main()
 	CLOUD MODE
 	*/
 	else if(mode == 2.0) {
-		fColor = vec4(1, 0, 0, 1);
+		fColor = vec4(1, 1, 1, 1);
 	}
 
 	/*
@@ -79,7 +70,23 @@ void main()
 	SPECULAR MODE
 	*/
 	else if(mode == 5.0) {
-		fColor = vec4(0, 1, 1, 1);
+		vec3 L = normalize(light_position.xyz - position.xyz);// LIGHT
+		vec3 V = normalize(-position.xyz);// VIEW
+		vec3 N = normalize(vN.xyz);// NORMAL
+		vec3 R = normalize(reflect(-L, N));// REFLECT
+
+		vec4 color;
+		if(texture(specMap, ftexCoord).a <= 0.1){ // land
+			color = vec4(0.0, 0.0, 0.0, 1.0);
+		} else {
+			color = vec4(1.0, 1.0, 1.0, 1.0);
+		}
+
+		vec4 amb = vec4(color) * ambient_light;
+		vec4 diff = max(dot(L, N.xyz), 0.0) * vec4(color) * light_color;
+		vec4 spec = pow(max(dot(R, V), 0.0), 30.0) * texture(specMap, ftexCoord) * light_color;
+		fColor = amb + diff + spec;
+
 	}
 
 	/*
@@ -93,31 +100,20 @@ void main()
 		//binormal is cross of normal and tangent vectors in eye space
 		vec3 vBinormal = cross(vNormal, vTangent);
 
-		//construct a change of coordinate frame mat4 with columns of
-		//Tangent, Binormal, Normal, (0,0,0,1)
-		mat4 mTangentSpace = mat4(vec4(vTangent,0.0), vec4(vBinormal,0.0), vec4(vNormal,0.0), vec4(0.0, 0.0, 0.0, 1.0));
-		//This will transform from local space (normal map values) to eye space
-
-		vec3 L = normalize(light_position - position).xyz;
 		vec3 E = normalize(-position).xyz;
-
-		vec4 N = vec4(vN, 0.0);
-		//multiply change of coordinate frame matrix by normal map value
-		//to convert from local space to eye space
-		N = mTangentSpace * N;
+		vec3 L = normalize(light_position.xyz - position.xyz);// LIGHT
+		vec3 V = normalize(-position.xyz);// VIEW
+		vec3 N = normalize(vN.xyz);// NORMAL
+		vec3 R = normalize(reflect(-L, N));// REFLECT
 
 		vec4 amb = texture(colorMap, ftexCoord) * ambient_light;
 		//calculate diffuse term using our eye-space vectors and the color map value
 		vec4 diff = max(dot(L,N.xyz), 0.0) * texture(colorMap, ftexCoord) * light_color;
+		vec4 spec = pow(max(dot(R, V), 0.0), 30.0) * texture(specMap, ftexCoord) * light_color;
+		fColor = amb + diff + spec;
 
-		fColor = amb + diff;
 	} else {
 		fColor = vec4(1, 1, 1, 1);
 	}
-
-	///read from normal map
-	//		//values stored in normal texture is [0,1] range, we need [-1, 1] range
-	//		vec4 N = (texture(normalMap, ftexCoord) - 0.5) * 2.0 ;
-
 
 }
