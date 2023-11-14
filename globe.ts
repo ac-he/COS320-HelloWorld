@@ -86,7 +86,7 @@ window.onload = function init() {
 
 
     //black background
-    gl.clearColor(0.0, 0.0, 0.0, 1.0);
+    gl.clearColor(1.0, 1.0, 0.0, 1.0);
     gl.enable(gl.DEPTH_TEST);
 
 
@@ -110,6 +110,12 @@ window.onload = function init() {
     gl.uniform1i(unightmapsampler, 3);//assign normal map to 2nd texture unit
     uspecularmapsampler = gl.getUniformLocation(program, "specMap");
     gl.uniform1i(uspecularmapsampler, 4);//assign this one to texture unit 0
+
+
+    //Enable blending
+    gl.enable(gl.BLEND);
+    //define a blending function
+    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
 
 
     //set up basic perspective viewing
