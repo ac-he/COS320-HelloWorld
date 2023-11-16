@@ -4,10 +4,36 @@
     <meta charset="UTF-8">
     <title>Hello World</title>
     <script type="module" src="globe.js"></script>
+
+    <link rel="stylesheet" type="text/css" href="styles.css" />
 </head>
 <body>
-<canvas id="gl-canvas" width="600" height="600">
-    Sorry; your web browser doesn't support HTML5's canvas element.
-</canvas>
+<table>
+    <tr>
+        <td>
+            <canvas id="gl-canvas" width="600" height="600">
+                Sorry; your web browser doesn't support HTML5's canvas element.
+            </canvas>
+        </td>
+        <td>
+            <h1>Hello World</h1>
+            <button id="color">Color [1]</button>
+            <button id="cloud">Clouds [2]</button>
+            <button id="night">Day/Night Cycle [3]</button>
+            <button id="normal">Normals [4]</button>
+            <button id="spec">Specular [5]</button>
+            <button id="all">All Effects [6]</button>
+            <div id="zoom-controls">
+                Click and drag to rotate | Zoom:
+                <button id="zoom-plus" class="zoom">[+]</button>
+                <span id="zoom"></span>
+                <button id="zoom-minus" class="zoom">[-]</button>
+            </div>
+
+        </td>
+    </tr>
+</table>
+
+
 </body>
 </html>

@@ -1,0 +1,31 @@
+body {
+    background-color: black;
+    color: green;
+    font-family: monospace;
+    text-align: right;
+}
+
+button {
+    background-color: black;
+    color: green;
+    font-family: monospace;
+    margin: 5px;
+    border: 0;
+    font-size: 14px;
+}
+
+.selected {
+    background-color: green;
+    color:black;
+}
+
+.zoom {
+    background-color: green;
+    color:black;
+    margin:0px;
+}
+
+#zoom-controls{
+    font-size: 14px;
+    margin:5px;
+}

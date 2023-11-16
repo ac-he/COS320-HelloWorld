@@ -73,6 +73,9 @@ let MODE_SPEC = 5;
 let MODE_ALL = 6;
 let currentMode = 1;
 
+let modeButtons:HTMLButtonElement[];
+let zoomAmount:HTMLSpanElement;
+
 
 window.onload = function init() {
 
@@ -82,15 +85,13 @@ window.onload = function init() {
         alert("WebGL isn't available");
     }
 
-
     //allow the user to rotate mesh with the mouse
     canvas.addEventListener("mousedown", mouse_down);
     canvas.addEventListener("mousemove", mouse_drag);
     canvas.addEventListener("mouseup", mouse_up);
 
-
     //black background
-    gl.clearColor(1.0, 1.0, 0.0, 1.0);
+    gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.enable(gl.DEPTH_TEST);
 
 
@@ -137,48 +138,116 @@ window.onload = function init() {
     xAngle = 0;
     yAngle = 0;
 
-    window.addEventListener("keydown" ,function(event){
-        switch(event.key) {
-            case "ArrowDown":
-                if(zoom < 170){
-                    zoom += 5;
-                }
-                break;
-            case "ArrowUp":
-                if(zoom > 10){
-                    zoom -= 5;
-                }
-                break;
-            case "1":
-                currentMode = MODE_COLOR;
-                break;
-            case "2":
-                currentMode = MODE_CLOUD;
-                break;
-            case "3":
-                currentMode = MODE_NIGHT;
-                break;
-            case "4":
-                currentMode = MODE_NORMAL;
-                break;
-            case "5":
-                currentMode = MODE_SPEC;
-                break;
-            case "6":
-                currentMode = MODE_ALL;
-                break;
-        }
+    modeButtons = [
+        document.getElementById("color") as HTMLButtonElement,
+        document.getElementById("cloud") as HTMLButtonElement,
+        document.getElementById("night") as HTMLButtonElement,
+        document.getElementById("normal") as HTMLButtonElement,
+        document.getElementById("spec") as HTMLButtonElement,
+        document.getElementById("all") as HTMLButtonElement,
+        document.getElementById("zoom-plus") as HTMLButtonElement,
+        document.getElementById("zoom-minus") as HTMLButtonElement,
+    ];
+    modeButtons[0].addEventListener("click", handleColorMapInput);
+    modeButtons[1].addEventListener("click", handleCloudMapInput);
+    modeButtons[2].addEventListener("click", handleNormalMapInput);
+    modeButtons[3].addEventListener("click", handleNightMapInput);
+    modeButtons[4].addEventListener("click", handleSpecularMapInput);
+    modeButtons[5].addEventListener("click", handleAllMapInput);
+    modeButtons[6].addEventListener("click", handleZoomIn);
+    modeButtons[7].addEventListener("click", handleZoomOut);
 
-        p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
-        gl.uniformMatrix4fv(uproj, false, p.flatten());
-        requestAnimationFrame(render);//and now we need a new frame since we made a change
-    });
+    zoomAmount = document.getElementById("zoom") as HTMLSpanElement;
+    zoomAmount.innerText = `${zoom}`;
+
+    handleColorMapInput(); // set the initial state to be the color map
+
+    window.addEventListener("keydown" ,handleKeyboardInput);
+
+    p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
+    gl.uniformMatrix4fv(uproj, false, p.flatten());
 
     window.setInterval(update, 16); //target 60 frames per second
 
     requestAnimationFrame(render);
 
 };
+
+function handleInput(key:string){
+    switch(key) {
+        case "ArrowDown":
+            if(zoom < 170){
+                zoom += 5;
+            }
+            zoomAmount.innerText = `${zoom}`;
+            break;
+        case "ArrowUp":
+            if(zoom > 10){
+                zoom -= 5;
+            }
+            zoomAmount.innerText = `${zoom}`;
+            break;
+        case "1":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_COLOR;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+        case "2":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_CLOUD;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+        case "3":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_NIGHT;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+        case "4":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_NORMAL;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+        case "5":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_SPEC;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+        case "6":
+            modeButtons[currentMode - 1].className = "";
+            currentMode = MODE_ALL;
+            modeButtons[currentMode - 1].className = "selected"
+            break;
+    }
+}
+
+function handleKeyboardInput(event){
+    handleInput(event.key);
+}
+
+function handleColorMapInput():void{
+    handleInput("1");
+}
+function handleCloudMapInput():void{
+    handleInput("2");
+}
+function handleNormalMapInput():void{
+    handleInput("3");
+}
+function handleNightMapInput():void{
+    handleInput("4");
+}
+function handleSpecularMapInput():void{
+    handleInput("5");
+}
+function handleAllMapInput():void{
+    handleInput("6");
+}
+function handleZoomIn():void{
+    handleInput("ArrowUp");
+}
+function handleZoomOut():void{
+    handleInput("ArrowDown");
+}
 
 function update(){
     earthRotation += 0.2;
@@ -364,17 +433,16 @@ function render(){
 
     //position camera 10 units back from origin
     let camera:mat4 = lookAt(new vec4(0, 0, 5, 1), new vec4(0, 0, 0, 1), new vec4(0, 1, 0, 0));
+    let lightPos = new vec4(0, 0, 50, 1)
+    p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
+    gl.uniformMatrix4fv(uproj, false, p.flatten());
 
-    let lightPos = new vec4(0, 0, 50, 1);
-
-    renderOneSphere(camera, lightPos, false);
-
-    renderOneSphere(camera, lightPos, true);
-
+    renderSphere(camera, lightPos, false);
+    renderSphere(camera, lightPos, true);
 
 }
 
-function renderOneSphere(camera:mat4, lightPos:vec4, isCloud:boolean){
+function renderSphere(camera:mat4, lightPos:vec4, isCloud:boolean){
     gl.uniform4fv(uLightPosition, rotateY(yAngle).mult(rotateX(xAngle).mult(lightPos)));
     gl.uniform4fv(uLightColor, [1,1,1,1]);
     gl.uniform4fv(uAmbienLight, [0.1, 0.1, 0.1, 1]);
