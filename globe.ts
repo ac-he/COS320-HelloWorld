@@ -21,7 +21,7 @@ let yAngle:number;
 let mouse_button_down:boolean = false;
 let prevMouseX:number = 0;
 let prevMouseY:number = 0;
-let zoom:number = 45;
+let zoom:number = 25;
 
 let earthRotation:number = 0;
 let cloudRotation:number = 0;
@@ -135,8 +135,8 @@ window.onload = function init() {
     makeSpheresAndBuffer(false);
 
     //initialize rotation angles
-    xAngle = 0;
-    yAngle = 0;
+    xAngle = 20;
+    yAngle = 80;
 
     modeButtons = [
         document.getElementById("color") as HTMLButtonElement,
@@ -160,7 +160,7 @@ window.onload = function init() {
     zoomAmount = document.getElementById("zoom") as HTMLSpanElement;
     zoomAmount.innerText = `${zoom}`;
 
-    handleColorMapInput(); // set the initial state to be the color map
+    handleAllMapInput(); // set the initial state to be the color map
 
     window.addEventListener("keydown" ,handleKeyboardInput);
 

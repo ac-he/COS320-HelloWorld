@@ -100,7 +100,9 @@ void main()
 	*/
 	else if(mode == 4.0) {
 		if(is_cloud == 0){
-			fColor = vec4(0, 1, 0, 1);
+			vec4 amb = texture(normalMap, ftexCoord);
+
+			fColor = amb;
 		}
 	}
 
@@ -168,6 +170,7 @@ void main()
 		}
 	} else {
 		fColor = vec4(1, 1, 1, 1);
+		// something went wrong O_O
 	}
 
 }
