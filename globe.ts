@@ -5,7 +5,7 @@ import {
     mat4,
     perspective,
     rotateX,
-    rotateY, rotateZ,
+    rotateY, rotateZ, scalem,
     translate,
     vec2,
     vec4
@@ -22,11 +22,15 @@ let mouse_button_down:boolean = false;
 let prevMouseX:number = 0;
 let prevMouseY:number = 0;
 let zoom:number = 45;
-let earthRotation:number = 0;
 
-let vPosition:GLint; //
-let vNormal:GLint; //actually need a normal vector to modify
-let vTangent:GLint; //need a tangent vector as well
+let earthRotation:number = 0;
+let cloudRotation:number = 0;
+
+let vPosition:GLint;
+let vNormal:GLint;
+let vTangent:GLint;
+let vTexCoord:GLint;
+
 let ucolormapsampler:WebGLUniformLocation;//this will be a pointer to our sampler2D
 let unormalmapsampler:WebGLUniformLocation;
 let ucloudmapsampler:WebGLUniformLocation;
@@ -35,7 +39,7 @@ let uspecularmapsampler:WebGLUniformLocation;
 let uLightPosition:WebGLUniformLocation;
 let uAmbienLight:WebGLUniformLocation;
 let uLightColor:WebGLUniformLocation;
-let vTexCoord:GLint;
+let uIsCloud:WebGLUniformLocation;
 let uMode:WebGLUniformLocation;
 
 
@@ -46,7 +50,7 @@ let uproj:WebGLUniformLocation; //uniform for projection matrix
 let mv:mat4; //local mv
 let p:mat4; //local projection
 
-//
+// smoothness of spheres
 let numVerts:number;
 
 let earthTex:WebGLTexture;
@@ -98,6 +102,7 @@ window.onload = function init() {
     uLightColor = gl.getUniformLocation(program, "light_color");
     uLightPosition = gl.getUniformLocation(program, "light_position");
     uAmbienLight = gl.getUniformLocation(program, "ambient_light");
+    uIsCloud = gl.getUniformLocation(program, "is_cloud");
     uMode = gl.getUniformLocation(program, "mode")
 
     ucolormapsampler = gl.getUniformLocation(program, "colorMap");
@@ -125,7 +130,8 @@ window.onload = function init() {
 
 
     initTextures();
-    makeSphereAndBuffer();
+    makeSpheresAndBuffer(true);
+    makeSpheresAndBuffer(false);
 
     //initialize rotation angles
     xAngle = 0;
@@ -175,10 +181,16 @@ window.onload = function init() {
 };
 
 function update(){
-    earthRotation += 0.25;
+    earthRotation += 0.2;
     if(earthRotation >= 360){
         earthRotation %= 360;
     }
+
+    cloudRotation += 0.25;
+    if(cloudRotation >= 360){
+        cloudRotation %= 360;
+    }
+
     requestAnimationFrame(render);
 }
 
@@ -213,7 +225,7 @@ function mouse_drag(event:MouseEvent){
 }
 
 //Make a square and send it over to the graphics card
-function makeSphereAndBuffer(){
+function makeSpheresAndBuffer( isCloud:boolean){
 
     let step:number = (360.0 / 60.0)*(Math.PI / 180.0);
     let sphereverts = [];
@@ -303,6 +315,8 @@ function makeSphereAndBuffer(){
     gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 56, 48);
     gl.enableVertexAttribArray(vTexCoord);
 
+
+
 }
 
 function initTextures() {
@@ -353,13 +367,42 @@ function render(){
 
     let lightPos = new vec4(0, 0, 50, 1);
 
+    renderOneSphere(camera, lightPos, false);
+
+    renderOneSphere(camera, lightPos, true);
+
+
+}
+
+function renderOneSphere(camera:mat4, lightPos:vec4, isCloud:boolean){
     gl.uniform4fv(uLightPosition, rotateY(yAngle).mult(rotateX(xAngle).mult(lightPos)));
     gl.uniform4fv(uLightColor, [1,1,1,1]);
     gl.uniform4fv(uAmbienLight, [0.1, 0.1, 0.1, 1]);
 
     gl.uniform1f(uMode, currentMode);
 
-    mv = camera.mult(rotateY(yAngle).mult(rotateX(xAngle).mult(rotateY(earthRotation))));
+    gl.uniform1i(uIsCloud, 0);
+    if(isCloud){
+        gl.uniform1i(uIsCloud, 1);
+    }
+
+
+    if(isCloud){
+        mv = camera
+                .mult(rotateY(yAngle)
+                .mult(rotateX(xAngle)
+                .mult(rotateY(cloudRotation)
+                .mult(scalem(1.01, 1.01, 1.01)
+            ))));
+    } else {
+        mv = camera
+                .mult(rotateY(yAngle)
+                .mult(rotateX(xAngle)
+                .mult(rotateY(earthRotation)
+                .mult(scalem(1.0, 1.0, 1.0)
+            ))));
+    }
+
     gl.uniformMatrix4fv(umv, false, mv.flatten());
 
     // COLOR
@@ -383,5 +426,4 @@ function render(){
     gl.bindTexture(gl.TEXTURE_2D, specTex);
 
     gl.drawArrays( gl.TRIANGLES, 0, numVerts );
-
 }
