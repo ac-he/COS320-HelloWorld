@@ -50,7 +50,7 @@ let uproj:WebGLUniformLocation; //uniform for projection matrix
 let mv:mat4; //local mv
 let p:mat4; //local projection
 
-// smoothness of spheres
+// total number of vertices to render
 let numVerts:number;
 
 let earthTex:WebGLTexture;
@@ -92,12 +92,12 @@ window.onload = function init() {
 
     //black background
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
-    gl.enable(gl.DEPTH_TEST);
 
-
+    // set up program
     program = initFileShaders(gl, "vshader-normal.glsl", "fshader-normal.glsl");
-
     gl.useProgram(program);
+
+    // set up uniforms
     umv = gl.getUniformLocation(program, "model_view");
     uproj = gl.getUniformLocation(program, "projection");
     uLightColor = gl.getUniformLocation(program, "light_color");
@@ -106,38 +106,38 @@ window.onload = function init() {
     uIsCloud = gl.getUniformLocation(program, "is_cloud");
     uMode = gl.getUniformLocation(program, "mode")
 
+    // set up textures
     ucolormapsampler = gl.getUniformLocation(program, "colorMap");
-    gl.uniform1i(ucolormapsampler, 0);//assign this one to texture unit 0
+    gl.uniform1i(ucolormapsampler, 0);
     ucloudmapsampler = gl.getUniformLocation(program, "cloudMap");
-    gl.uniform1i(ucloudmapsampler, 1);//assign this one to texture unit 0
+    gl.uniform1i(ucloudmapsampler, 1);
     unormalmapsampler = gl.getUniformLocation(program, "normalMap");
-    gl.uniform1i(unormalmapsampler, 2);//assign normal map to 2nd texture unit
+    gl.uniform1i(unormalmapsampler, 2);
     unightmapsampler = gl.getUniformLocation(program, "nightMap");
-    gl.uniform1i(unightmapsampler, 3);//assign normal map to 2nd texture unit
+    gl.uniform1i(unightmapsampler, 3);
     uspecularmapsampler = gl.getUniformLocation(program, "specMap");
-    gl.uniform1i(uspecularmapsampler, 4);//assign this one to texture unit 0
+    gl.uniform1i(uspecularmapsampler, 4);
 
-
-    //Enable blending
+    //Enable blending and depth
     gl.enable(gl.BLEND);
-    //define a blending function
     gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-
+    gl.enable(gl.DEPTH_TEST);
 
     //set up basic perspective viewing
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
     gl.uniformMatrix4fv(uproj, false, p.flatten());
 
-
+    // make spheres
     initTextures();
     makeSpheresAndBuffer(true);
     makeSpheresAndBuffer(false);
 
     //initialize rotation angles
-    xAngle = 20;
-    yAngle = 80;
+    xAngle = 0;
+    yAngle = 40;
 
+    //create buttons
     modeButtons = [
         document.getElementById("color") as HTMLButtonElement,
         document.getElementById("cloud") as HTMLButtonElement,
@@ -159,18 +159,20 @@ window.onload = function init() {
 
     zoomAmount = document.getElementById("zoom") as HTMLSpanElement;
     zoomAmount.innerText = `${zoom}`;
-
     handleAllMapInput(); // set the initial state to be the color map
 
+    // prepare for keyboard input
     window.addEventListener("keydown" ,handleKeyboardInput);
 
+    // set up projection matrix
     p = perspective(zoom, (canvas.clientWidth / canvas.clientHeight), 1, 20);
     gl.uniformMatrix4fv(uproj, false, p.flatten());
 
-    window.setInterval(update, 16); //target 60 frames per second
+    //target 60 frames per second
+    window.setInterval(update, 16);
 
+    // draw first frame
     requestAnimationFrame(render);
-
 };
 
 function handleInput(key:string){
@@ -182,7 +184,7 @@ function handleInput(key:string){
             zoomAmount.innerText = `${zoom}`;
             break;
         case "ArrowUp":
-            if(zoom > 10){
+            if(zoom > 5){
                 zoom -= 5;
             }
             zoomAmount.innerText = `${zoom}`;
@@ -296,7 +298,7 @@ function mouse_drag(event:MouseEvent){
 //Make a square and send it over to the graphics card
 function makeSpheresAndBuffer( isCloud:boolean){
 
-    let step:number = (360.0 / 60.0)*(Math.PI / 180.0);
+    let step:number = (360.0 / 180.0)*(Math.PI / 180.0);
     let sphereverts = [];
 
     numVerts = 0;
@@ -311,50 +313,57 @@ function makeSpheresAndBuffer( isCloud:boolean){
             let ax = Math.sin(lat) * Math.sin(lon);
             let ay = Math.cos(lat);
             let az = Math.cos(lon) * Math.sin(lat);
+            let a = new vec4( ax, ay, az, 1.0);
+            let an = new vec4(ax, ay, az, 0.0);
 
             let bx = Math.sin(lat) * Math.sin(lon + step);
             let by = Math.cos(lat);
             let bz = Math.sin(lat) * Math.cos(lon + step)
+            let b = new vec4(bx, by, bz,  1.0);
+            let bn = new vec4(bx, by, bz,  0.0);
 
             let cx = Math.sin(lat + step) * Math.sin(lon + step);
             let cy = Math.cos(lat + step);
             let cz = Math.cos(lon + step) * Math.sin(lat + step);
+            let c= new vec4( cx, cy, cz, 1.0);
+            let cn= new vec4( cx, cy, cz, 0.0);
 
             let dx = Math.sin(lat + step) * Math.sin(lon);
             let dy = Math.cos(lat + step);
             let dz = Math.sin(lat + step) * Math.cos(lon);
+            let d = new vec4(dx, dy, dz,  1.0);
+            let dn = new vec4(dx, dy, dz,  0.0);
 
-            //TODO tangents need to be calculated properly. right now tangent = normal
             //triangle 1
-            sphereverts.push(new vec4( ax, ay, az, 1.0));
-            sphereverts.push(new vec4( ax, ay, az, 0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon), Math.cos(lat),Math.cos(lon) * Math.sin(lat),  0.0));
+            sphereverts.push(a);
+            sphereverts.push(an);
+            sphereverts.push(getTangent(a, lon));
             sphereverts.push(new vec2(lonTexCoord0,latTexCoord1)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(bx, by, bz,  1.0));
-            sphereverts.push(new vec4(bx, by, bz,  0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon + step),  Math.cos(lat),Math.sin(lat) * Math.cos(lon + step), 0.0));
+            sphereverts.push(b);
+            sphereverts.push(bn);
+            sphereverts.push(getTangent(b, lon));
             sphereverts.push(new vec2(lonTexCoord1,latTexCoord1)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4( cx, cy, cz, 1.0));
-            sphereverts.push(new vec4( cx, cy, cz, 0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step), Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step),  0.0));
+            sphereverts.push(c);
+            sphereverts.push(cn);
+            sphereverts.push(getTangent(c, lon));
             sphereverts.push(new vec2(lonTexCoord1,latTexCoord0)); //texture coordinates, bottom left
 
             // //triangle 2
-            sphereverts.push(new vec4( cx, cy, cz, 1.0));
-            sphereverts.push(new vec4( cx, cy, cz, 0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon + step),  Math.cos(lat + step),Math.cos(lon + step) * Math.sin(lat + step), 0.0));
+            sphereverts.push(c);
+            sphereverts.push(cn);
+            sphereverts.push(getTangent(c, lon));
             sphereverts.push(new vec2(lonTexCoord1,latTexCoord0)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4(dx, dy, dz,  1.0));
-            sphereverts.push(new vec4(dx, dy, dz, 0.0));
-            sphereverts.push(new vec4(Math.sin(lat + step) * Math.sin(lon), Math.cos(lat + step), Math.sin(lat + step) * Math.cos(lon), 0.0));
+            sphereverts.push(d);
+            sphereverts.push(dn);
+            sphereverts.push(getTangent(d, lon));
             sphereverts.push(new vec2(lonTexCoord0,latTexCoord0)); //texture coordinates, bottom left
 
-            sphereverts.push(new vec4( ax, ay, az, 1.0));
-            sphereverts.push(new vec4( ax, ay, az,  0.0));
-            sphereverts.push(new vec4(Math.sin(lat) * Math.sin(lon),  Math.cos(lat),Math.cos(lon) * Math.sin(lat), 0.0));
+            sphereverts.push(a);
+            sphereverts.push(an);
+            sphereverts.push(getTangent(a, lon));
             sphereverts.push(new vec2(lonTexCoord0,latTexCoord1)); //texture coordinates, bottom left
 
             numVerts += 6;
@@ -383,9 +392,22 @@ function makeSpheresAndBuffer( isCloud:boolean){
     vTexCoord = gl.getAttribLocation(program, "texCoord");
     gl.vertexAttribPointer(vTexCoord, 2, gl.FLOAT, false, 56, 48);
     gl.enableVertexAttribArray(vTexCoord);
+}
 
+function getTangent(normal:vec4, lat:number){
+    if(lat > Math.PI/2){ // northern hemisphere
+        // the east vector is found by crossing the normal vector with a south-facing vector
+        let south = new vec4(0.0, -1.0, 0.0, 1.0);
+        return normal.cross(south);
+    }
 
+    // southern hemisphere
+    // the east vector is found by crossing the normal vector with a north-facing vector
+    let north = new vec4(0.0, 1.0, 0.0, 1.0);
+    return north.cross(normal);
 
+    // since the north and south hemispheres are opposite, both the direction of the north/south vector and the order
+    // they are crossed in have to be switched.
 }
 
 function initTextures() {
@@ -419,7 +441,8 @@ function handleTextureLoaded(image:HTMLImageElement, texture:WebGLTexture) {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-    //gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_NEAREST);
     gl.generateMipmap(gl.TEXTURE_2D);
     let anisotropic_ext:EXT_texture_filter_anisotropic = gl.getExtension('EXT_texture_filter_anisotropic');
     gl.texParameterf(gl.TEXTURE_2D, anisotropic_ext.TEXTURE_MAX_ANISOTROPY_EXT, 8);
@@ -453,7 +476,6 @@ function renderSphere(camera:mat4, lightPos:vec4, isCloud:boolean){
     if(isCloud){
         gl.uniform1i(uIsCloud, 1);
     }
-
 
     if(isCloud){
         mv = camera
